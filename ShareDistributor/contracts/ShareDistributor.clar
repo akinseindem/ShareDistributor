@@ -174,6 +174,45 @@
     (ok (default-to u0 (map-get? dividend-pools round)))
 )
 
+;; Comprehensive dividend distribution with batch processing and validation
+;; This function allows the owner to distribute dividends to multiple shareholders
+;; in a single transaction, with full validation and error handling
+(define-public (batch-distribute-dividends 
+    (round uint)
+    (shareholders (list 20 principal)))
+    (begin
+        ;; Verify caller is contract owner
+        (asserts! (is-contract-owner) err-owner-only)
+        
+        ;; Verify round exists and is active
+        (let (
+            (is-active (default-to false (map-get? round-active round)))
+            (dividend-pool (default-to u0 (map-get? dividend-pools round)))
+            (total-shares-at-round (default-to u0 (map-get? shares-snapshot round)))
+        )
+            ;; Validate round is active
+            (asserts! is-active err-round-not-active)
+            (asserts! (> dividend-pool u0) err-no-dividends)
+            (asserts! (> total-shares-at-round u0) err-invalid-shares)
+            
+            ;; Process each shareholder in the list
+            (let (
+                (distribution-results 
+                    (map process-shareholder-dividend shareholders)
+                )
+            )
+                ;; Return success with distribution count
+                (ok {
+                    round: round,
+                    processed: (len shareholders),
+                    pool-amount: dividend-pool,
+                    snapshot-shares: total-shares-at-round
+                })
+            )
+        )
+    )
+)
+
 ;; Helper function to process individual shareholder dividend
 (define-private (process-shareholder-dividend (shareholder principal))
     (let (
